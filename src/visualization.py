@@ -1,10 +1,13 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-
+import numpy as np
+from matplotlib.axes import Axes
+from numpy.typing import NDArray
 from kinematics import forward_kinematics
+from workspace import Workspace
 
 
-def draw_workspace(ws, theta1=0.0, theta2=0.0, ax=None, title="Workspace"):
+def draw_workspace(ws: Workspace, theta1: float=0.0, theta2: float=0.0, ax=None, title="Workspace"):
     """
     Renders the workspace: body cavity bounds, obstacles, and the arm at (theta1, theta2).
     Pass an existing ax to embed in a larger figure (e.g. dual-panel), or leave None
@@ -54,6 +57,42 @@ def draw_workspace(ws, theta1=0.0, theta2=0.0, ax=None, title="Workspace"):
     ax.plot(*shoulder,     'ko', ms=10, zorder=4)
     ax.plot(*elbow,        'ko', ms=7,  zorder=4)
     ax.plot(*end_effector, 'r*', ms=12, zorder=4)
+
+    if standalone:
+        plt.tight_layout()
+        plt.show()
+
+    return ax
+
+
+def draw_cspace(bitmap: NDArray[np.bool_], ax=None, title="C-space"):
+    """
+    Renders the C-space bitmap. Black = in-collision, white = free.
+    theta1 on x-axis, theta2 on y-axis, both spanning [-π, π].
+    Pass an existing ax to embed in a dual-panel figure.
+    """
+    standalone = ax is None
+    if standalone:
+        _, ax = plt.subplots(figsize=(6, 6))
+
+    ax.imshow(
+        bitmap.T,           # transpose: rows=theta2, cols=theta1 → x=theta1, y=theta2
+        origin='lower',
+        extent=[-np.pi, np.pi, -np.pi, np.pi],
+        cmap='gray_r',      # black = collision (True), white = free (False)
+        aspect='auto',
+        interpolation='nearest'
+    )
+
+    ticks = [-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi]
+    labels = ['-π', '-π/2', '0', 'π/2', 'π']
+    ax.set_xticks(ticks)
+    ax.set_xticklabels(labels)
+    ax.set_yticks(ticks)
+    ax.set_yticklabels(labels)
+    ax.set_xlabel('θ1')
+    ax.set_ylabel('θ2')
+    ax.set_title(title)
 
     if standalone:
         plt.tight_layout()

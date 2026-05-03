@@ -2,7 +2,7 @@ import numpy as np
 from workspace import Robot
 
 
-def forward_kinematics(robot: Robot, theta1, theta2):
+def forward_kinematics(robot: Robot, theta1: float, theta2: float) -> tuple[tuple[float, float], tuple[float, float]]:
     """
     Returns (x, y) coordinates of elbow and end effector based on joint angles.
     shoulder is fixed at robot.base and is not returned.
@@ -19,7 +19,7 @@ def forward_kinematics(robot: Robot, theta1, theta2):
     return (elbow_x, elbow_y), (end_eff_x, end_eff_y)
 
 
-def is_point_reachable(robot: Robot, x: float, y: float):
+def is_point_reachable(robot: Robot, x: float, y: float) -> bool:
     """True if (x, y) lies within the arm's reachable annulus."""
     base_x, base_y = robot.base
     L1, L2 = robot.link_lengths
@@ -27,7 +27,7 @@ def is_point_reachable(robot: Robot, x: float, y: float):
     return abs(L1 - L2) <= dist <= L1 + L2
 
 
-def inverse_kinematics(robot: Robot, x: float, y: float):
+def inverse_kinematics(robot: Robot, x: float, y: float) -> list[tuple[float, float]]:
     """
     Returns list of (theta1, theta2) solutions placing the end-effector at (x, y).
     [] if geometrically unreachable.
