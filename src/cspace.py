@@ -2,6 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 from workspace import Workspace
 
+
 def build_cspace_bitmap(workspace: Workspace, resolution: int = 200) -> NDArray[np.bool_]:
     """
     Returns a (resolution x resolution) boolean array representing C-space.
@@ -54,3 +55,18 @@ def _segment_intersects_circle_grid(p1_x, p1_y, p2_x, p2_y, center_x, center_y, 
 
     return (center_x - closest_x) ** 2 + (center_y - closest_y) ** 2 <= radius ** 2
 
+
+def config_to_index(theta1: float, theta2: float, resolution: int) -> tuple[int, int]:
+    """Maps (theta1, theta2) angles to (i, j) indices into the bitmap."""
+    step = 2 * np.pi / resolution
+    i = int((theta1 + np.pi) / step) % resolution
+    j = int((theta2 + np.pi) / step) % resolution
+    return i, j
+
+
+def index_to_config(i: int, j: int, resolution: int) -> tuple[float, float]:
+    """Maps (i, j) bitmap indices to the center angles (theta1, theta2) of that cell."""
+    step = 2 * np.pi / resolution
+    theta1 = -np.pi + (i + 0.5) * step
+    theta2 = -np.pi + (j + 0.5) * step
+    return theta1, theta2

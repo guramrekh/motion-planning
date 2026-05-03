@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
-from matplotlib.axes import Axes
 from numpy.typing import NDArray
 from kinematics import forward_kinematics
 from workspace import Workspace
@@ -99,3 +98,56 @@ def draw_cspace(bitmap: NDArray[np.bool_], ax=None, title="C-space"):
         plt.show()
 
     return ax
+
+
+def draw_plan(
+    ws: Workspace,
+    bitmap: NDArray[np.bool_],
+    path: list[tuple[float, float]],
+    start_config: tuple[float, float],
+    goal_config: tuple[float, float],
+    ax_ws=None,
+    ax_cs=None,
+):
+    """
+    Side-by-side path planning visualization.
+    Left: workspace with start arm (faded) and goal arm (full color), end-effectors marked.
+    Right: C-space bitmap with the A* path overlaid.
+    Pass (ax_ws, ax_cs) to embed in an existing figure, or leave both None
+    to create a standalone 1x2 figure. Returns (ax_ws, ax_cs).
+    """
+    standalone = ax_ws is None and ax_cs is None
+    if standalone:
+        _, (ax_ws, ax_cs) = plt.subplots(1, 2, figsize=(14, 6))
+
+    thetas = np.array(path)
+    _, start_end_eff = forward_kinematics(ws.robot, *start_config)
+    _, goal_end_eff  = forward_kinematics(ws.robot, *goal_config)
+
+    # goal arm (full color) drawn by draw_workspace
+    draw_workspace(ws, theta1=goal_config[0], theta2=goal_config[1],
+                   ax=ax_ws, title="Workspace — start & goal")
+
+    # start arm overlaid faded
+    shoulder = ws.robot.base
+    start_elbow, _ = forward_kinematics(ws.robot, *start_config)
+    ax_ws.plot([shoulder[0], start_elbow[0]], [shoulder[1], start_elbow[1]],
+               color='steelblue', lw=6, alpha=0.3, solid_capstyle='round', zorder=3)
+    ax_ws.plot([start_elbow[0], start_end_eff[0]], [start_elbow[1], start_end_eff[1]],
+               color='cornflowerblue', lw=4, alpha=0.3, solid_capstyle='round', zorder=3)
+
+    ax_ws.plot(*start_end_eff, 'go', ms=10, zorder=5, label='start end-effector')
+    ax_ws.plot(*goal_end_eff,  'g*', ms=14, zorder=5, label='goal end-effector')
+    ax_ws.legend()
+
+    draw_cspace(bitmap, ax=ax_cs, title="C-space — A* path")
+    ax_cs.plot(thetas[:, 0], thetas[:, 1], color='cyan', linewidth=1.5, label='path')
+    ax_cs.plot(thetas[0, 0],  thetas[0, 1],  'go', ms=8,  label='start')
+    ax_cs.plot(thetas[-1, 0], thetas[-1, 1], 'r*', ms=10, label='goal')
+    ax_cs.legend(loc='upper right')
+
+    if standalone:
+        plt.tight_layout()
+        plt.show()
+
+    return ax_ws, ax_cs
