@@ -9,7 +9,7 @@ from workspace import Workspace
 
 def draw_workspace(ws: Workspace, theta1: float=0.0, theta2: float=0.0, ax=None, title="Workspace"):
     """
-    Renders the workspace: body cavity bounds, obstacles, and the arm at (theta1, theta2).
+    Renders the workspace: bounds, obstacles, and the arm at (theta1, theta2).
     Pass an existing ax to embed in a larger figure (e.g. dual-panel), or leave None
     to create a standalone figure.
     Returns the axes object.
@@ -27,25 +27,15 @@ def draw_workspace(ws: Workspace, theta1: float=0.0, theta2: float=0.0, ax=None,
     ax.set_xlabel('x')
     ax.set_ylabel('y')
 
-    # cavity border
     border = patches.Rectangle(
         (xmin, ymin), xmax - xmin, ymax - ymin,
         linewidth=2, edgecolor='#555', facecolor='none', zorder=1
     )
     ax.add_patch(border)
 
-    # obstacles (organs)
     for obs in ws.obstacles:
-        ax.add_patch(patches.Circle(
-            obs.center_point, obs.radius,
-            color='salmon', alpha=0.75, zorder=2
-        ))
-        ax.add_patch(patches.Circle(
-            obs.center_point, obs.radius,
-            fill=False, edgecolor='firebrick', linewidth=1.5, zorder=2
-        ))
+        obs.draw(ax)
 
-    # arm
     shoulder = ws.robot.base
     elbow, end_effector = forward_kinematics(ws.robot, theta1, theta2)
 
@@ -169,10 +159,7 @@ def _draw_workspace_bg(ws: Workspace, ax, title: str = "Workspace") -> np.ndarra
         linewidth=2, edgecolor='#555', facecolor='none', zorder=1,
     ))
     for obs in ws.obstacles:
-        ax.add_patch(patches.Circle(obs.center_point, obs.radius,
-                                    color='salmon', alpha=0.75, zorder=2))
-        ax.add_patch(patches.Circle(obs.center_point, obs.radius,
-                                    fill=False, edgecolor='firebrick', linewidth=1.5, zorder=2))
+        obs.draw(ax)
     shoulder = np.array(ws.robot.base, dtype=float)
     ax.plot(*shoulder, 'ko', ms=10, zorder=4)
     return shoulder
@@ -195,7 +182,7 @@ def animate_path(
     thetas = np.array(path)
     draw_cspace(bitmap, ax=ax_cs, title="C-space — A* path")
     ax_cs.plot(thetas[:, 0], thetas[:, 1], color='cyan', lw=1.5, label='path')
-    ax_cs.plot(thetas[0, 0],  thetas[0, 1],  'go', ms=8,  label='start')
+    ax_cs.plot(thetas[0, 0], thetas[0, 1], 'go', ms=8, label='start')
     ax_cs.plot(thetas[-1, 0], thetas[-1, 1], 'r*', ms=10, label='goal')
     ax_cs.legend(loc='upper right')
     cs_dot, = ax_cs.plot([], [], 'yo', ms=8, zorder=6)

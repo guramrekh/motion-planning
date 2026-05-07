@@ -27,33 +27,10 @@ def build_cspace_bitmap(workspace: Workspace, resolution: int = 200) -> NDArray[
     bitmap = np.zeros((resolution, resolution), dtype=bool)
 
     for obs in workspace.obstacles:
-        center_x, center_y = obs.center_point
-        radius = obs.radius
-        # link 1: shoulder → elbow
-        bitmap |= _segment_intersects_circle_grid(base_x, base_y, elbow_x, elbow_y, center_x, center_y, radius)
-        # link 2: elbow → end effector
-        bitmap |= _segment_intersects_circle_grid(elbow_x, elbow_y, end_eff_x, end_eff_y, center_x, center_y, radius)
+        bitmap |= obs.intersects_segment_grid(base_x, base_y, elbow_x, elbow_y)
+        bitmap |= obs.intersects_segment_grid(elbow_x, elbow_y, end_eff_x, end_eff_y)
 
     return bitmap
-
-
-def _segment_intersects_circle_grid(p1_x, p1_y, p2_x, p2_y, center_x, center_y, radius):
-    """
-    Vectorized segment-circle collision test for a grid of segments.
-    p1 can be scalar (fixed shoulder) or a 2D array; p2 is always a 2D array.
-    Returns a boolean array of the same shape as p2_x.
-    """
-    dx = p2_x - p1_x
-    dy = p2_y - p1_y
-    vx = center_x - p1_x
-    vy = center_y - p1_y
-
-    t = np.clip((vx * dx + vy * dy) / (dx * dx + dy * dy), 0.0, 1.0)
-
-    closest_x = p1_x + t * dx
-    closest_y = p1_y + t * dy
-
-    return (center_x - closest_x) ** 2 + (center_y - closest_y) ** 2 <= radius ** 2
 
 
 def config_to_index(theta1: float, theta2: float, resolution: int) -> tuple[int, int]:
