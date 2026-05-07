@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
 import matplotlib.patches as patches
+import theme
 
 
 class Robot:
@@ -50,8 +51,11 @@ class CircleObstacle(Obstacle):
         return (cx - closest_x) ** 2 + (cy - closest_y) ** 2 <= self.radius ** 2
 
     def draw(self, ax) -> None:
-        ax.add_patch(patches.Circle(self.center_point, self.radius, color='salmon', alpha=0.75, zorder=2))
-        ax.add_patch(patches.Circle(self.center_point, self.radius, fill=False, edgecolor='firebrick', linewidth=1.5, zorder=2))
+        ax.add_patch(patches.Circle(self.center_point, self.radius,
+                                    color=theme.OBSTACLE_FILL, alpha=0.92, zorder=2))
+        ax.add_patch(patches.Circle(self.center_point, self.radius,
+                                    fill=False, edgecolor=theme.OBSTACLE_EDGE,
+                                    linewidth=1.6, zorder=2))
 
 
 class PolygonObstacle(Obstacle):
@@ -101,12 +105,13 @@ class PolygonObstacle(Obstacle):
         result |= _point_in_convex_poly_grid(p2_x, p2_y, self._e1, self._e2)
         return result
 
-    def draw(self, ax):
+    def draw(self, ax) -> None:
         xy = self.vertices
         ax.add_patch(patches.Polygon(xy, closed=True,
-                    color='salmon', alpha=0.75, zorder=2))
+                                     color=theme.OBSTACLE_FILL, alpha=0.92, zorder=2))
         ax.add_patch(patches.Polygon(xy, closed=True,
-                    fill=False, edgecolor='firebrick', linewidth=1.5, zorder=2))
+                                     fill=False, edgecolor=theme.OBSTACLE_EDGE,
+                                     linewidth=1.6, zorder=2))
 
 
 def _segs_cross(p1, p2, e1, e2) -> bool:
@@ -146,8 +151,30 @@ def _point_in_convex_poly_grid(px, py, e1s, e2s):
     return inside
 
 
+class BoundaryObstacle(Obstacle):
+    """Workspace boundary walls — flags any arm segment whose endpoint leaves the rectangle."""
+    def __init__(self, xmin: float, xmax: float, ymin: float, ymax: float):
+        self.xmin, self.xmax = xmin, xmax
+        self.ymin, self.ymax = ymin, ymax
+
+    def _outside(self, x, y):
+        return (x < self.xmin) | (x > self.xmax) | (y < self.ymin) | (y > self.ymax)
+
+    def intersects_segment(self, p1, p2) -> bool:
+        return bool(self._outside(p1[0], p1[1]) or self._outside(p2[0], p2[1]))
+
+    def intersects_segment_grid(self, p1_x, p1_y, p2_x, p2_y):
+        return self._outside(p1_x, p1_y) | self._outside(p2_x, p2_y)
+
+    def draw(self, ax) -> None:
+        pass  # frame already rendered by _setup_ws_ax
+
+
 class Workspace:
-    def __init__(self, robot: Robot, obstacles: list[Obstacle], bounds: tuple[float, float, float, float]):
+    def __init__(self, robot: Robot, obstacles: list[Obstacle], bounds: tuple[float, float, float, float], closed: bool = False):
         self.robot = robot
-        self.obstacles = obstacles
+        self.obstacles = list(obstacles)
         self.bounds = bounds  # (xmin, xmax, ymin, ymax)
+        self.closed = closed
+        if closed:
+            self.obstacles.append(BoundaryObstacle(*bounds))
