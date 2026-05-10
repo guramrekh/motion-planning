@@ -10,6 +10,12 @@ _NEIGHBOR_OFFSETS = (
     ( 1, -1), ( 1, 0), ( 1, 1),
 )
 
+# theta1 axis spans [0, π], theta2 axis spans [-π, π], so the two axes have
+# different step sizes — distances must account for that anisotropy.
+_STEP1_FACTOR = np.pi          # multiplied by 1/resolution to get Δθ1 per cell
+_STEP2_FACTOR = 2 * np.pi      # multiplied by 1/resolution to get Δθ2 per cell
+
+
 def grid_neighbors(bitmap: NDArray[np.bool_], cell: tuple[int, int]) -> list[tuple[int, int]]:
     """8-connected neighbor cells that are in-bounds and free (not in collision)."""
     i, j = cell
@@ -24,10 +30,9 @@ def grid_neighbors(bitmap: NDArray[np.bool_], cell: tuple[int, int]) -> list[tup
 
 def grid_cost(a: tuple[int, int], b: tuple[int, int], resolution: int) -> float:
     """Euclidean distance in θ-space between cell-center configurations."""
-    step = 2 * np.pi / resolution
-    di = b[0] - a[0]
-    dj = b[1] - a[1]
-    return step * np.hypot(di, dj)
+    dtheta1 = (b[0] - a[0]) * _STEP1_FACTOR / resolution
+    dtheta2 = (b[1] - a[1]) * _STEP2_FACTOR / resolution
+    return float(np.hypot(dtheta1, dtheta2))
 
 
 def grid_heuristic(a: tuple[int, int], goal: tuple[int, int], resolution: int) -> float:
@@ -48,17 +53,16 @@ def plan_path(
     Plans a path from start_angles to goal_angles through free C-space using A*
     over the bitmap.
 
-    Snaps endpoints to their containing cells. The returned path is a list of
-    (theta1, theta2) tuples at cell centers; returns None if start and goal lie
-    in different connected components of the free C-space.
-
-    The caller is responsible for separately verifying that start/goal cells are
-    free (failure mode 2). If either cell is in collision, this function will
-    still return None, but the caller cannot distinguish that from a true
-    no-path case (failure mode 3).
+    Validates start/goal: raises ValueError if either configuration is out of
+    range (θ1 ∉ [0, π] or θ2 ∉ [-π, π]) or lands in a collision cell.
+    Returns None when both endpoints are valid but lie in different connected
+    components of the free C-space.
     """
+    _validate_config(bitmap, start_angles, resolution, "start")
+    _validate_config(bitmap, goal_angles,  resolution, "goal")
+
     start_idx = config_to_index(*start_angles, resolution)
-    goal_idx = config_to_index(*goal_angles, resolution)
+    goal_idx  = config_to_index(*goal_angles,  resolution)
 
     path_indices = a_star(
         start=start_idx,
@@ -72,3 +76,18 @@ def plan_path(
         return None
 
     return [index_to_config(i, j, resolution) for (i, j) in path_indices]
+
+
+def _validate_config(bitmap, angles, resolution, label):
+    theta1, theta2 = angles
+    if not (0 <= theta1 <= np.pi):
+        raise ValueError(
+            f"{label} theta1={theta1:.3f} is outside [0, π] — "
+            f"the C-space excludes negative theta1 (elbow below workspace floor)."
+        )
+    if not (-np.pi <= theta2 <= np.pi):
+        raise ValueError(
+            f"{label} theta2={theta2:.3f} is outside [-π, π]."
+        )
+    if bitmap[config_to_index(theta1, theta2, resolution)]:
+        raise ValueError(f"{label} configuration is in collision.")

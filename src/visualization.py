@@ -102,7 +102,7 @@ def draw_workspace(ws: Workspace, theta1: float = 0.0, theta2: float = 0.0, ax=N
 def draw_cspace(bitmap: NDArray[np.bool_], ax=None, title="C-space"):
     """
     Renders the C-space bitmap. Black = in-collision, white = free.
-    theta1 on x-axis, theta2 on y-axis, both spanning [-π, π].
+    theta1 on x-axis (∈ [0, π]), theta2 on y-axis (∈ [-π, π]).
     Pass an existing ax to embed in a dual-panel figure.
     """
     standalone = ax is None
@@ -112,18 +112,16 @@ def draw_cspace(bitmap: NDArray[np.bool_], ax=None, title="C-space"):
     ax.imshow(
         bitmap.T,
         origin='lower',
-        extent=[-np.pi, np.pi, -np.pi, np.pi],
+        extent=[0, np.pi, -np.pi, np.pi],
         cmap='gray_r',      # black = collision, white = free
         aspect='auto',
         interpolation='nearest'
     )
 
-    ticks = [-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi]
-    labels = ['-π', '-π/2', '0', 'π/2', 'π']
-    ax.set_xticks(ticks)
-    ax.set_xticklabels(labels)
-    ax.set_yticks(ticks)
-    ax.set_yticklabels(labels)
+    ax.set_xticks([0, np.pi / 4, np.pi / 2, 3 * np.pi / 4, np.pi])
+    ax.set_xticklabels(['0', 'π/4', 'π/2', '3π/4', 'π'])
+    ax.set_yticks([-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi])
+    ax.set_yticklabels(['-π', '-π/2', '0', 'π/2', 'π'])
     ax.set_xlabel('θ1')
     ax.set_ylabel('θ2')
     ax.set_title(title)
@@ -295,10 +293,13 @@ def interactive_planner(ws: Workspace, bitmap: NDArray[np.bool_], resolution=200
         if not is_point_reachable(ws.robot, x, y):
             return None, "outside arm's reach", []
         solutions = inverse_kinematics(ws.robot, x, y)
-        free = [(t1, t2) for t1, t2 in solutions
+        # Filter to solutions whose theta1 is in the planner's range [0, π]
+        # (negative theta1 puts the elbow below the workspace floor)
+        in_range = [(t1, t2) for t1, t2 in solutions if 0 <= t1 <= np.pi]
+        free = [(t1, t2) for t1, t2 in in_range
                 if not bitmap[config_to_index(t1, t2, resolution)]]
         if not free:
-            return None, "in collision", solutions
+            return None, "in collision", in_range or solutions
         return free[0], None, solutions
 
     def on_click(event):
@@ -355,7 +356,14 @@ def interactive_planner(ws: Workspace, bitmap: NDArray[np.bool_], resolution=200
             fig.canvas.draw_idle()
             print(f"  ✓ Goal   θ1={np.degrees(goal_config[0]):.1f}°  θ2={np.degrees(goal_config[1]):.1f}°")
 
-            path = plan_path(bitmap, start_config, goal_config, resolution)
+            try:
+                path = plan_path(bitmap, start_config, goal_config, resolution)
+            except ValueError as e:
+                print(f"  ✗ {e}")
+                ax_ws.set_title(f"Planning failed — {e}", color=theme.FRAME_EDGE)
+                cs_goal_dot.set_data([], [])
+                fig.canvas.draw_idle()
+                return
             if path is None:
                 print("  ✗ No collision-free path — start and goal are in disconnected free regions.")
                 ax_ws.set_title("No path found — click a new goal", color=theme.FRAME_EDGE)

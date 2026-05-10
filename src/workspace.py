@@ -171,10 +171,7 @@ class BoundaryObstacle(Obstacle):
 
 
 class Workspace:
-    def __init__(self, robot: Robot, obstacles: list[Obstacle], bounds: tuple[float, float, float, float], closed: bool = False):
+    def __init__(self, robot: Robot, obstacles: list[Obstacle], bounds: tuple[float, float, float, float]):
         self.robot = robot
-        self.obstacles = list(obstacles)
         self.bounds = bounds  # (xmin, xmax, ymin, ymax)
-        self.closed = closed
-        if closed:
-            self.obstacles.append(BoundaryObstacle(*bounds))
+        self.obstacles = list(obstacles) + [BoundaryObstacle(*bounds)]
